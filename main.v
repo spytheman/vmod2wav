@@ -42,10 +42,9 @@ mut:
 }
 
 fn write_wav_header(mut f os.File, data_size u32) ! {
-	chunk_size := u32(36 + data_size)
-	fmt := u16(1)
 	channels := u16(2)
 	bits := u16(16)
+	chunk_size := u32(36 + data_size)
 	rate := u32(sample_rate)
 	byte_rate := u32(rate * u32(channels) * u32(bits) / 8)
 	block_align := u16(channels * bits / 8)
@@ -53,20 +52,15 @@ fn write_wav_header(mut f os.File, data_size u32) ! {
 	f.write_le(chunk_size)!
 	f.write_string('WAVE')!
 	f.write_string('fmt ')!
-	fmt_size := u32(16)
-	f.write_le(fmt_size)!
-	f.write_le(fmt)!
-	f.write_le(channels)!
+	f.write_le[u32](16)! // block size = chunk size - 8
+	f.write_le[u16](1)! // audio format 1 = PCM integer
+	f.write_le(channels)! // channels
 	f.write_le(rate)!
 	f.write_le(byte_rate)!
 	f.write_le(block_align)!
 	f.write_le(bits)!
 	f.write_string('data')!
 	f.write_le(data_size)!
-}
-
-fn swap16(v u16) u16 {
-	return (v >> 8) | (v << 8)
 }
 
 fn period_to_step(period u16) u32 {
@@ -231,14 +225,11 @@ fn main() {
 	unsafe {
 		for i in 0 .. samples.len {
 			in_file.read_into_ptr(&u8(&samples[i].name), 22)!
-			in_file.read_into_ptr(&u8(&samples[i].length), 2)!
-			samples[i].length = swap16(samples[i].length) * 2
+			samples[i].length = in_file.read_be[u16]()! * 2
 			in_file.read_into_ptr(u8(&samples[i].finetune), 1)!
 			in_file.read_into_ptr(&samples[i].volume, 1)!
-			in_file.read_into_ptr(&u8(&samples[i].repeat_start), 2)!
-			samples[i].repeat_start = swap16(samples[i].repeat_start) * 2
-			in_file.read_into_ptr(&u8(&samples[i].repeat_length), 2)!
-			samples[i].repeat_length = swap16(samples[i].repeat_length) * 2
+			samples[i].repeat_start = in_file.read_be[u16]()! * 2
+			samples[i].repeat_length = in_file.read_be[u16]()! * 2
 		}
 	}
 	mut song_length := u8(0)
@@ -248,7 +239,9 @@ fn main() {
 
 	mut pattern_table := [128]u8{}
 	in_file.read_into_ptr(&pattern_table[0], 128)!
-	in_file.seek(4, .current)!
+	fourcc := [4]u8{}
+	in_file.read_into_ptr(&fourcc[0], 4)!
+	println('FOURCC: ${fourcc[..].bytestr()}')
 
 	mut max_pattern := u8(0)
 	for i in 0 .. 128 {
@@ -267,7 +260,7 @@ fn main() {
 		in_file.read_into_ptr(sample_data[i], int(samples[i].length))!
 	}
 	in_file.close()
-    //////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////
 	mut out_file := os.create(os.args[2]) or {
 		eprintln('Output file error: ${err}')
 		exit(1)
