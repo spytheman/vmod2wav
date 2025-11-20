@@ -3,7 +3,7 @@ module main
 import os
 
 const sample_rate = 44100
-const tick_samples = i32(sample_rate / 57.4)
+const tick_samples = i32(sample_rate / 57.4) // TODO: implement a proper speed change support, instead of tweaking this
 
 const sine_table = [i32(0), 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
 	255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24]!
@@ -41,6 +41,18 @@ mut:
 	tremolo_depth u8
 }
 
+@[inline]
+fn (mut ch Channel) limit_volume() {
+	if ch.param & 0xF0 != 0 {
+		ch.volume += (ch.param >> 4)
+	} else {
+		ch.volume -= (ch.param & 0x0F)
+	}
+	if ch.volume > 64 {
+		ch.volume = if ch.volume > 200 { u8(0) } else { 64 }
+	}
+}
+
 fn write_wav_header(mut f os.File, data_size u32) ! {
 	channels := u16(2)
 	bits := u16(16)
@@ -63,12 +75,26 @@ fn write_wav_header(mut f os.File, data_size u32) ! {
 	f.write_le(data_size)!
 }
 
-fn period_to_step(period u16) u32 {
-	if period == 0 {
-		return 0
+@[inline]
+fn clamp[T](min T, val T, max T) T {
+	return if val < min {
+		min
+	} else {
+		if val > max {
+			max
+		} else {
+			val
+		}
 	}
-	freq := f64(3546895.0) / f64(period)
-	return u32((freq / sample_rate) * 65536.0)
+}
+
+@[inline]
+fn period_to_step(period u16) u32 {
+	return if period == 0 {
+		u32(0)
+	} else {
+		u32((f64(3546895.0) / f64(period) / sample_rate) * 65536.0)
+	}
 }
 
 fn process_effects(mut ch Channel, tick int) {
@@ -135,51 +161,25 @@ fn process_effects(mut ch Channel, tick int) {
 		}
 		0x5 {
 			// Tone portamento + volume slide; Porta handled above
-			if ch.param & 0xF0 != 0 {
-				ch.volume += (ch.param >> 4)
-			} else {
-				ch.volume -= (ch.param & 0x0F)
-			}
-			if ch.volume > 64 {
-				ch.volume = if ch.volume > 200 { u8(0) } else { 64 }
-			}
+			ch.limit_volume()
 		}
 		0x6 {
 			// Vibrato + volume slide; Vibrato handled above
-			if ch.param & 0xF0 != 0 {
-				ch.volume += (ch.param >> 4)
-			} else {
-				ch.volume -= (ch.param & 0x0F)
-			}
-			if ch.volume > 64 {
-				ch.volume = if ch.volume > 200 { u8(0) } else { 64 }
-			}
+			ch.limit_volume()
 		}
 		0x7 {
 			// Tremolo
 			if ch.tremolo_speed != 0 && ch.tremolo_depth != 0 {
 				delta := (sine_table[ch.tremolo_pos] * int(ch.tremolo_depth)) / 64
 				mut vol := int(ch.volume) + delta
-				if vol < 0 {
-					vol = 0
-				}
-				if vol > 64 {
-					vol = 64
-				}
+				vol = clamp(0, vol, 64)
 				ch.volume = u8(vol)
 				ch.tremolo_pos = (ch.tremolo_pos + ch.tremolo_speed) & 31
 			}
 		}
 		0xA {
 			// Volume slide
-			if ch.param & 0xF0 != 0 {
-				ch.volume += (ch.param >> 4)
-			} else {
-				ch.volume -= (ch.param & 0x0F)
-			}
-			if ch.volume > 64 {
-				ch.volume = if ch.volume > 200 { u8(0) } else { 64 }
-			}
+			ch.limit_volume()
 		}
 		0xE {
 			// Extended effects
@@ -328,7 +328,7 @@ fn main() {
 					}
 				}
 				if effect == 0xC {
-					ch[c].volume = u8(if param > 64 { 64 } else { param })
+					ch[c].volume = u8(clamp(0, param, 64))
 				}
 				if effect == 0xF && param < 32 {
 					speed = int(param)
@@ -365,16 +365,8 @@ fn main() {
 							}
 						}
 					}
-					out_left := if left > 32767 {
-						i16(32767)
-					} else {
-						if left < -32768 { i16(-32768) } else { i16(left) }
-					}
-					out_right := if right > 32767 {
-						i16(32767)
-					} else {
-						if right < -32768 { i16(-32768) } else { i16(right) }
-					}
+					out_left := i16(clamp(-32768, left, 32767))
+					out_right := i16(clamp(-32768, right, 32767))
 					out_file.write_le(out_left)!
 					out_file.write_le(out_right)!
 					samples_written += 4

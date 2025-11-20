@@ -1,4 +1,5 @@
 main
-mod2wav.exe
-vv.wav
+main.exe
 mod2wav
+mod2wav.exe
+*.wav
