@@ -7,3 +7,4 @@ Resources about the .MOD format:
 - https://eblong.com/zarf/blorb/mod-spec.txt
 - https://moddingwiki.shikadi.net/wiki/MOD_Format
 - https://archive.org/download/file-format-encyclopedia (a .ZIP file describing many older file formats).
+- https://github.com/lclevy/unmo3/blob/master/spec/mod.txt
