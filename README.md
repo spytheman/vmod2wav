@@ -13,6 +13,7 @@ serialize/store/load data for this MOS Technology 8364 R4 chip, that does the ac
 
 Other players/decoders (written in C/C++):
 ==============================================
+- https://mikmod.sourceforge.net
 - https://github.com/kode54/dumb
 - https://github.com/lclevy/unmo3
 - https://github.com/libxmp/libxmp
