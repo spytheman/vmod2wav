@@ -3,7 +3,7 @@
 all: vv.wav
 
 clean:
-	rm -rf mod2wav.exe *.wav
+	rm -rf mod2wav mod2wav.exe *.wav
 	
 mod2wav.exe: main.v
 	v -o mod2wav.exe main.v
