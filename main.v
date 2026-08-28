@@ -3,14 +3,14 @@ module main
 import os
 
 const sample_rate = 44100
-const tick_samples = i32(sample_rate / 57.4) // TODO: implement a proper speed change support, instead of tweaking this
+const tick_samples = i32(sample_rate / 50) // TODO: implement a proper speed change support, instead of tweaking this
 
 const sine_table = [i32(0), 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
 	255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24]!
 
 struct Sample {
 mut:
-	name          [22]byte
+	name          [22]u8
 	length        u16
 	finetune      i8
 	volume        u8
